@@ -7,13 +7,9 @@ import { Mic, MicOff, Send, PlayCircle, Square, ArrowLeft } from 'lucide-react';
 export default function SinglePageApp() {
   const [currentView, setCurrentView] = useState<'landing' | 'chat'>('landing');
 
-  // ==========================================
-  // CHAT LOGIC
-  // ==========================================
+  // 1. The Purist Approach: Pull exactly what we need from the SDK
+  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error } = useChat(); 
   
-  // Notice we pull 'error' out here so we can show it on screen if the backend fails
-  const { messages, setMessages, append, reload, isLoading, error }: any = useChat(); 
-  const [chatInput, setChatInput] = useState(''); 
   const [isListening, setIsListening] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -23,24 +19,6 @@ export default function SinglePageApp() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, currentView]);
-
-  const handleCustomSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || isLoading) return;
-
-    // 1. Grab the text
-    const content = chatInput; 
-    
-    // 2. Clear the input box immediately so it feels fast
-    setChatInput('');
-
-    // 3. Let the SDK natively handle updating the UI AND contacting the backend
-    try {
-      await append({ role: 'user', content: content });
-    } catch (err) {
-      console.error("Append failed", err);
-    }
-  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -65,7 +43,8 @@ export default function SinglePageApp() {
         .map((result: any) => result.transcript)
         .join('');
         
-      setChatInput(transcript); 
+      // 2. Feed voice directly into the SDK's native input handler
+      handleInputChange({ target: { value: transcript } } as any); 
     };
     
     recognition.onerror = () => setIsListening(false);
@@ -86,9 +65,6 @@ export default function SinglePageApp() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // ==========================================
-  // VIEW: CHAT INTERFACE
-  // ==========================================
   if (currentView === 'chat') {
     return (
       <div className="flex flex-col h-screen bg-slate-50">
@@ -133,8 +109,7 @@ export default function SinglePageApp() {
               </div>
             ))}
             
-            {/* The Loading Indicator */}
-            {isLoading && messages[messages.length - 1]?.role === 'user' && (
+            {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-white border border-slate-200 text-slate-500 rounded-2xl rounded-bl-none p-4 shadow-sm flex space-x-2">
                   <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
@@ -144,11 +119,10 @@ export default function SinglePageApp() {
               </div>
             )}
 
-            {/* The Error Catcher */}
             {error && (
               <div className="flex justify-center my-4">
                 <div className="bg-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-medium border border-red-200 shadow-sm">
-                  ⚠️ Backend Error: {error.message || "Check your VS Code Terminal for details"}
+                  ⚠️ Backend Error: {error.message || "Failed to fetch. Check Vercel Runtime Logs."}
                 </div>
               </div>
             )}
@@ -159,20 +133,22 @@ export default function SinglePageApp() {
 
         <footer className="p-4 bg-white border-t border-slate-200">
           <div className="max-w-3xl mx-auto">
-            <form onSubmit={handleCustomSubmit} className="flex items-center gap-2 bg-slate-100 p-2 rounded-full border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            {/* 3. Wire up the native handleSubmit */}
+            <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-slate-100 p-2 rounded-full border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
               <button type="button" onClick={toggleListening} className={`p-3 rounded-full transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-slate-500 hover:bg-slate-200 hover:text-slate-700'}`}>
                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}
               </button>
               
+              {/* 4. Wire up the native input and handleInputChange */}
               <input 
                 className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-slate-800 placeholder-slate-400 px-2" 
-                value={chatInput} 
-                onChange={(e) => setChatInput(e.target.value)} 
+                value={input || ''} 
+                onChange={handleInputChange} 
                 placeholder={isListening ? "Listening..." : "Message NextGen AI..."} 
                 disabled={isLoading || isListening} 
               />
               
-              <button type="submit" disabled={isLoading || !chatInput.trim()} className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
+              <button type="submit" disabled={isLoading || !input?.trim()} className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
                 <Send size={20} />
               </button>
             </form>
@@ -182,9 +158,6 @@ export default function SinglePageApp() {
     );
   }
 
-  // ==========================================
-  // VIEW: LANDING PAGE
-  // ==========================================
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
