@@ -8,13 +8,13 @@ export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
   const { messages } = await req.json();
 
-  // Call the language model
-  const result = streamText({
+  // Call the language model (Notice the 'await' added here!)
+  const result = await streamText({
     model: google('gemini-2.5-flash'), 
     messages,
     system: "You are a helpful, concise, and professional conversational AI agent."
   });
 
-  // Respond with the stream (Updated for latest AI SDK format)
+  // Respond with the stream
   return result.toDataStreamResponse();
 }
