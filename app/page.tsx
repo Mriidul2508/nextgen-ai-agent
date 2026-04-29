@@ -1,16 +1,17 @@
 'use client';
 
-import { useChat } from '@ai-sdk/react';
+import { useChat } from '@ai-sdk/react'; 
 import { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, PlayCircle, Square, ArrowLeft } from 'lucide-react';
 
 export default function SinglePageApp() {
   const [currentView, setCurrentView] = useState<'landing' | 'chat'>('landing');
 
-  // 1. Only pull the universally supported features from the SDK
-  const { messages, append, isLoading, error } = useChat() as any; 
+  // 1. Destructure BOTH v4 and v5 methods safely
+  const chatState = useChat() as any; 
+  const { messages, sendMessage, append, isLoading, error } = chatState;
   
-  // 2. Use standard, bulletproof React state for the input box
+  // Use manual React state for input (Required in SDK v5)
   const [chatInput, setChatInput] = useState('');
   
   const [isListening, setIsListening] = useState(false);
@@ -23,15 +24,19 @@ export default function SinglePageApp() {
     }
   }, [messages, currentView]);
 
-  // 3. Custom submit handler that works with any SDK version
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isLoading) return;
 
-    // Send the message to the AI
-    append({ role: 'user', content: chatInput });
+    // 2. The Magic Fix: Route to the new v5 sendMessage function
+    if (typeof sendMessage === 'function') {
+      sendMessage({ text: chatInput });
+    } else if (typeof append === 'function') {
+      append({ role: 'user', content: chatInput });
+    } else {
+      console.error("SDK hook failed to initialize sending functions.");
+    }
     
-    // Clear the input box
     setChatInput('');
   };
 
@@ -58,8 +63,7 @@ export default function SinglePageApp() {
         .map((result: any) => result.transcript)
         .join('');
         
-      // 4. Safely feed voice directly into standard React state!
-      setChatInput(transcript); 
+      setChatInput(transcript);
     };
     
     recognition.onerror = () => setIsListening(false);
@@ -99,30 +103,37 @@ export default function SinglePageApp() {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.length === 0 && (
+            {(!messages || messages.length === 0) && (
               <div className="text-center text-slate-500 mt-20">
                 <h2 className="text-2xl font-semibold text-slate-700 mb-2">How can I help you today?</h2>
                 <p>Type a message or click the microphone to start speaking.</p>
               </div>
             )}
             
-            {messages.map((m: any) => (
-              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-                  m.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
-                }`}>
-                  <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
-                  {m.role === 'assistant' && (
-                    <div className="mt-3 flex justify-end">
-                      <button onClick={() => toggleSpeech(m.content, m.id)} className="text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-xs font-medium">
-                        {speakingId === m.id ? <Square size={16} /> : <PlayCircle size={16} />}
-                        {speakingId === m.id ? 'Stop' : 'Listen'}
-                      </button>
-                    </div>
-                  )}
+            {messages?.map((m: any) => {
+              // 3. The Magic Fix 2: Extract text from v5 parts array or fallback to v4 content
+              const messageText = m.parts 
+                ? m.parts.map((p: any) => p.text).join('') 
+                : m.content;
+
+              return (
+                <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
+                    m.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
+                  }`}>
+                    <div className="whitespace-pre-wrap leading-relaxed">{messageText}</div>
+                    {m.role === 'assistant' && (
+                      <div className="mt-3 flex justify-end">
+                        <button onClick={() => toggleSpeech(messageText, m.id)} className="text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-xs font-medium">
+                          {speakingId === m.id ? <Square size={16} /> : <PlayCircle size={16} />}
+                          {speakingId === m.id ? 'Stop' : 'Listen'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {isLoading && (
               <div className="flex justify-start">
