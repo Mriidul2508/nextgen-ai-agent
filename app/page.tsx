@@ -28,18 +28,17 @@ export default function SinglePageApp() {
     e.preventDefault();
     if (!chatInput.trim() || isLoading) return;
 
-    const userMessage = { role: 'user', content: chatInput, id: Date.now().toString() };
-
-    const newMessages = [...messages, userMessage as any];
-    if (setMessages) setMessages(newMessages);
-
+    // 1. Grab the text
+    const content = chatInput; 
+    
+    // 2. Clear the input box immediately so it feels fast
     setChatInput('');
 
+    // 3. Let the SDK natively handle updating the UI AND contacting the backend
     try {
-      await append(userMessage as any);
+      await append({ role: 'user', content: content });
     } catch (err) {
-      console.error("Append failed, trying reload", err);
-      if (reload) reload();
+      console.error("Append failed", err);
     }
   };
 
