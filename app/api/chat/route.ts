@@ -10,11 +10,11 @@ export async function POST(req: Request) {
 
   // Call the language model
   const result = streamText({
-    model: google('gemini-2.5-flash'), // Extremely fast model for conversational AI
+    model: google('gemini-2.5-flash'), 
     messages,
     system: "You are a helpful, concise, and professional conversational AI agent."
   });
 
-  // Respond with the stream
-  return result.toTextStreamResponse();
+  // Respond with the stream (Updated for latest AI SDK format)
+  return result.toDataStreamResponse();
 }
