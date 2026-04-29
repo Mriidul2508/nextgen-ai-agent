@@ -7,8 +7,11 @@ import { Mic, MicOff, Send, PlayCircle, Square, ArrowLeft } from 'lucide-react';
 export default function SinglePageApp() {
   const [currentView, setCurrentView] = useState<'landing' | 'chat'>('landing');
 
-  // 1. The Purist Approach: Pull exactly what we need from the SDK
-  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error } = useChat() as any; 
+  // 1. Only pull the universally supported features from the SDK
+  const { messages, append, isLoading, error } = useChat() as any; 
+  
+  // 2. Use standard, bulletproof React state for the input box
+  const [chatInput, setChatInput] = useState('');
   
   const [isListening, setIsListening] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -19,6 +22,18 @@ export default function SinglePageApp() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, currentView]);
+
+  // 3. Custom submit handler that works with any SDK version
+  const handleCustomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isLoading) return;
+
+    // Send the message to the AI
+    append({ role: 'user', content: chatInput });
+    
+    // Clear the input box
+    setChatInput('');
+  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -43,8 +58,8 @@ export default function SinglePageApp() {
         .map((result: any) => result.transcript)
         .join('');
         
-      // 2. Feed voice directly into the SDK's native input handler
-      handleInputChange({ target: { value: transcript } } as any); 
+      // 4. Safely feed voice directly into standard React state!
+      setChatInput(transcript); 
     };
     
     recognition.onerror = () => setIsListening(false);
@@ -122,7 +137,7 @@ export default function SinglePageApp() {
             {error && (
               <div className="flex justify-center my-4">
                 <div className="bg-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-medium border border-red-200 shadow-sm">
-                  ⚠️ Backend Error: {error.message || "Failed to fetch. Check Vercel Runtime Logs."}
+                  ⚠️ Backend Error: {error.message || "Failed to fetch response."}
                 </div>
               </div>
             )}
@@ -133,22 +148,20 @@ export default function SinglePageApp() {
 
         <footer className="p-4 bg-white border-t border-slate-200">
           <div className="max-w-3xl mx-auto">
-            {/* 3. Wire up the native handleSubmit */}
-            <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-slate-100 p-2 rounded-full border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+            <form onSubmit={handleCustomSubmit} className="flex items-center gap-2 bg-slate-100 p-2 rounded-full border border-slate-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
               <button type="button" onClick={toggleListening} className={`p-3 rounded-full transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-slate-500 hover:bg-slate-200 hover:text-slate-700'}`}>
                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}
               </button>
               
-              {/* 4. Wire up the native input and handleInputChange */}
               <input 
                 className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-slate-800 placeholder-slate-400 px-2" 
-                value={input || ''} 
-                onChange={handleInputChange} 
+                value={chatInput} 
+                onChange={(e) => setChatInput(e.target.value)} 
                 placeholder={isListening ? "Listening..." : "Message NextGen AI..."} 
                 disabled={isLoading || isListening} 
               />
               
-              <button type="submit" disabled={isLoading || !input?.trim()} className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
+              <button type="submit" disabled={isLoading || !chatInput.trim()} className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
                 <Send size={20} />
               </button>
             </form>
