@@ -8,7 +8,7 @@ export default function SinglePageApp() {
   const [currentView, setCurrentView] = useState<'landing' | 'chat'>('landing');
 
   // 1. The Purist Approach: Pull exactly what we need from the SDK
-  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error } = useChat(); 
+  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, error } = useChat() as any; 
   
   const [isListening, setIsListening] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
